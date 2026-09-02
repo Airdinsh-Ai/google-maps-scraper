@@ -1,0 +1,12 @@
+# Laufzeit-Abhängigkeiten für den Google Maps Lead Scraper
+selenium>=4.20.0
+webdriver-manager>=4.0.1
+beautifulsoup4>=4.12.3
+lxml>=5.2.0
+requests>=2.31.0
+pandas>=2.2.0
+openpyxl>=3.1.2
+PySide6>=6.7.0
+
+# Für die optionale asynchrone E-Mail-Anreicherung
+aiohttp>=3.9.0
