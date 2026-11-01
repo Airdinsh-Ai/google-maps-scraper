@@ -16,10 +16,7 @@ Python. Die Umstrukturierung in dieses Projekt (Modultrennung, GUI, Aufräumen
 des Codes) entstand im selben Prozess - als Lernprojekt, an dem ich mich Stück
 für Stück weiter durcharbeite.
 
-![Platzhalter: Screenshot der Oberfläche](resources/screenshot-placeholder.png)
-
-> Screenshots folgen, sobald die App das erste Mal auf allen drei
-> Plattformen gebaut wurde.
+![Screenshot der Oberfläche](resources/screenshot.png)
 
 ## Funktionen
 
