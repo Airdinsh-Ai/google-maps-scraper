@@ -46,8 +46,13 @@ wenn man selbst am Quellcode arbeiten oder die Anwendung selbst bauen möchte.
 
 ## Fertige Anwendung nutzen (für Endnutzer ohne Python)
 
-1. Die passende Datei für dein Betriebssystem aus dem
-   [Releases-Bereich](../../releases) dieses Repositories herunterladen:
+> **Noch nicht verfügbar:** Es wurde bisher kein Release veröffentlicht, der
+> Releases-Bereich dieses Repositories ist also aktuell leer. Bis zum ersten
+> Release bitte den Abschnitt "Für Entwickler: Aus dem Quellcode starten"
+> unten verwenden. Sobald ein Release existiert, gilt hier:
+
+1. Die passende Datei für dein Betriebssystem aus dem Releases-Bereich
+   dieses Repositories herunterladen:
    - **Windows:** `GoogleMapsLeadScraper-windows.zip` entpacken und
      `GoogleMapsLeadScraper.exe` starten
    - **macOS:** `GoogleMapsLeadScraper-macos.zip` entpacken und
@@ -61,10 +66,6 @@ wenn man selbst am Quellcode arbeiten oder die Anwendung selbst bauen möchte.
    direkt beim Start an.
 3. Branche und mindestens eine Stadt eingeben, auf "Scraping starten"
    klicken.
-
-> Hinweis: Die fertigen Installer-Dateien werden pro Plattform separat
-> gebaut (siehe Abschnitt "Selbst bauen" unten) und im Releases-Bereich
-> von GitHub bereitgestellt, sobald ein Release veröffentlicht wurde.
 
 ## Für Entwickler: Aus dem Quellcode starten
 
