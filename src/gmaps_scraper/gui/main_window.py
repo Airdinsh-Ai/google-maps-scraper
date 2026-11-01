@@ -10,8 +10,8 @@ from __future__ import annotations
 import logging
 import os
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFileDialog,
@@ -46,6 +46,37 @@ logger = get_logger(__name__)
 
 APP_TITLE = "Google Maps Lead Scraper"
 DEFAULT_OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "GMapsScraper", "output")
+
+EMAIL_CELL_BACKGROUND = QColor("#1e5631")
+EMAIL_CELL_FOREGROUND = QColor("white")
+
+TOGGLE_STYLE_ON = "background-color: #2e7d32; color: white; font-weight: bold;"
+TOGGLE_STYLE_OFF = "background-color: #c62828; color: white; font-weight: bold;"
+
+# Beide Buttons mit demselben Radius, damit sie optisch zusammenpassen.
+# Start: dunkelgrün solange klickbar, grau sobald das Scraping läuft (disabled).
+START_BUTTON_STYLE = """
+    QPushButton { border-radius: 6px; padding: 6px 14px; }
+    QPushButton:enabled { background-color: #1b5e20; color: white; }
+    QPushButton:disabled { background-color: #9e9e9e; color: #616161; }
+"""
+# Stop: grau/inaktiv bis das Scraping läuft, dann rote Schrift auf schwarzem Grund.
+STOP_BUTTON_STYLE = """
+    QPushButton { border-radius: 6px; padding: 6px 14px; }
+    QPushButton:enabled { background-color: black; color: red; }
+    QPushButton:disabled { background-color: #9e9e9e; color: #616161; }
+"""
+
+# Hinzufügen: grün sobald im Eingabefeld Text steht, sonst normales Aussehen.
+ADD_CITY_BUTTON_STYLE_ACTIVE = (
+    "background-color: #2e7d32; color: white; font-weight: bold; border-radius: 6px; padding: 4px 10px;"
+)
+# Entfernen: dunkelrot sobald mindestens eine Stadt ausgewählt ist, sonst ausgegraut (disabled).
+REMOVE_CITY_BUTTON_STYLE = """
+    QPushButton { border-radius: 6px; padding: 4px 10px; }
+    QPushButton:enabled { background-color: #8b0000; color: white; font-weight: bold; }
+    QPushButton:disabled { background-color: #9e9e9e; color: #616161; }
+"""
 
 
 class MainWindow(QMainWindow):
@@ -97,11 +128,12 @@ class MainWindow(QMainWindow):
             "z. B. Düsseldorf (mehrere Städte auch Komma-getrennt möglich)"
         )
         self.stadt_input.returnPressed.connect(self._on_add_city_clicked)
+        self.stadt_input.textChanged.connect(self._on_stadt_input_changed)
         stadt_row.addWidget(self.stadt_input)
 
-        add_city_button = QPushButton("Hinzufügen")
-        add_city_button.clicked.connect(self._on_add_city_clicked)
-        stadt_row.addWidget(add_city_button)
+        self.add_city_button = QPushButton("Hinzufügen")
+        self.add_city_button.clicked.connect(self._on_add_city_clicked)
+        stadt_row.addWidget(self.add_city_button)
         layout.addLayout(stadt_row)
 
         # Liste der hinzugefügten Städte + Entfernen-Button
@@ -109,11 +141,14 @@ class MainWindow(QMainWindow):
         self.city_list_widget = QListWidget()
         self.city_list_widget.setMaximumHeight(90)
         self.city_list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.city_list_widget.itemSelectionChanged.connect(self._on_city_selection_changed)
         city_list_row.addWidget(self.city_list_widget)
 
-        remove_city_button = QPushButton("Ausgewählte\nentfernen")
-        remove_city_button.clicked.connect(self._on_remove_selected_cities)
-        city_list_row.addWidget(remove_city_button)
+        self.remove_city_button = QPushButton("Ausgewählte\nentfernen")
+        self.remove_city_button.setStyleSheet(REMOVE_CITY_BUTTON_STYLE)
+        self.remove_city_button.setEnabled(False)
+        self.remove_city_button.clicked.connect(self._on_remove_selected_cities)
+        city_list_row.addWidget(self.remove_city_button)
         layout.addLayout(city_list_row)
 
         # Erweiterte Optionen
@@ -128,6 +163,7 @@ class MainWindow(QMainWindow):
         self.fetch_email_checkbox.setCheckable(True)
         self.fetch_email_checkbox.setChecked(True)
         self.fetch_email_checkbox.toggled.connect(self._on_toggle_email_fetch)
+        self._on_toggle_email_fetch(self.fetch_email_checkbox.isChecked())
         options_row.addWidget(self.fetch_email_checkbox)
 
         options_row.addStretch(1)
@@ -141,11 +177,13 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.start_button = QPushButton("▶ Scraping starten")
+        self.start_button.setStyleSheet(START_BUTTON_STYLE)
         self.start_button.clicked.connect(self._on_start_clicked)
         layout.addWidget(self.start_button)
 
         self.stop_button = QPushButton("■ Stoppen")
         self.stop_button.setEnabled(False)
+        self.stop_button.setStyleSheet(STOP_BUTTON_STYLE)
         self.stop_button.clicked.connect(self._on_stop_clicked)
         layout.addWidget(self.stop_button)
 
@@ -199,6 +237,12 @@ class MainWindow(QMainWindow):
         export_csv_button.clicked.connect(lambda: self._on_export_clicked("csv"))
         layout.addWidget(export_csv_button)
 
+        self.last_export_label = QLabel("Daten: –")
+        self.last_export_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        self.last_export_label.setOpenExternalLinks(False)
+        self.last_export_label.linkActivated.connect(self._on_open_exported_file)
+        layout.addWidget(self.last_export_label)
+
         layout.addStretch(1)
         return container
 
@@ -229,8 +273,15 @@ class MainWindow(QMainWindow):
         for item in self.city_list_widget.selectedItems():
             self.city_list_widget.takeItem(self.city_list_widget.row(item))
 
+    def _on_stadt_input_changed(self, text: str) -> None:
+        self.add_city_button.setStyleSheet(ADD_CITY_BUTTON_STYLE_ACTIVE if text.strip() else "")
+
+    def _on_city_selection_changed(self) -> None:
+        self.remove_city_button.setEnabled(bool(self.city_list_widget.selectedItems()))
+
     def _on_toggle_email_fetch(self, checked: bool) -> None:
         self.fetch_email_checkbox.setText("E-Mail-Suche: An" if checked else "E-Mail-Suche: Aus")
+        self.fetch_email_checkbox.setStyleSheet(TOGGLE_STYLE_ON if checked else TOGGLE_STYLE_OFF)
 
     def _collect_queries(self) -> list[SearchQuery] | None:
         branche = self.branche_input.text().strip()
@@ -312,15 +363,22 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, APP_TITLE, message)
 
     def _append_table_row(self, record: BusinessRecord) -> None:
-        row_index = self.table.rowCount()
-        self.table.insertRow(row_index)
+        # Sortierung während des Einfügens abschalten, sonst landen Zellen
+        # einer neuen Zeile (durch Zwischensortierung) in falschen Zeilen.
+        self.table.setSortingEnabled(False)
+        try:
+            row_index = self.table.rowCount()
+            self.table.insertRow(row_index)
 
-        values = [record.name, record.address, record.phone, record.website, record.email]
-        for col_index, value in enumerate(values):
-            item = QTableWidgetItem(value or "N/A")
-            if col_index == 4 and value:  # E-Mail gefunden -> optisch hervorheben
-                item.setBackground(QColor(220, 245, 220))
-            self.table.setItem(row_index, col_index, item)
+            values = [record.name, record.address, record.phone, record.website, record.email]
+            for col_index, value in enumerate(values):
+                item = QTableWidgetItem(value or "N/A")
+                if col_index == 4 and value:  # E-Mail gefunden -> optisch hervorheben
+                    item.setBackground(EMAIL_CELL_BACKGROUND)
+                    item.setForeground(EMAIL_CELL_FOREGROUND)
+                self.table.setItem(row_index, col_index, item)
+        finally:
+            self.table.setSortingEnabled(True)
 
     def _update_count_label(self) -> None:
         self.count_label.setText(f"{len(self.records)} Einträge")
@@ -352,7 +410,13 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, APP_TITLE, f"Export fehlgeschlagen:\n\n{exc}")
             return
 
+        file_url = QUrl.fromLocalFile(filepath).toString()
+        self.last_export_label.setText(f'Daten: <a href="{file_url}">{filepath}</a>')
+
         QMessageBox.information(self, APP_TITLE, f"Export erfolgreich gespeichert unter:\n{filepath}")
+
+    def _on_open_exported_file(self, href: str) -> None:
+        QDesktopServices.openUrl(QUrl(href))
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt-Namenskonvention)
         if self.worker is not None and self.worker.isRunning():

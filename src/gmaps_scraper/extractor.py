@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
@@ -46,8 +47,21 @@ PHONE_SELECTORS = (
 WEBSITE_SELECTORS = (
     '//a[@data-item-id="authority"]',
     '//a[contains(@aria-label, "Website")]',
-    '//a[contains(@href, "http") and not(contains(@href, "google.com"))]',
+    '//a[contains(@href, "http") and not(contains(@href, "google.")) and not(contains(@href, "gstatic.com"))]',
 )
+
+# Google-eigene Domains (google.de, google.com, gstatic.com, ...) sind keine Firmenwebsites.
+GOOGLE_DOMAIN_PATTERN = re.compile(
+    r"(^|\.)(google\.[a-z.]+|gstatic\.com|googleusercontent\.com|goo\.gl|g\.co)$", re.IGNORECASE
+)
+
+
+def is_google_domain(url: str) -> bool:
+    """True, wenn die URL auf eine Google-eigene Domain zeigt (keine echte Firmenwebsite)."""
+    if not url:
+        return False
+    host = urlparse(url).netloc.lower().split("@")[-1].split(":")[0]
+    return bool(GOOGLE_DOMAIN_PATTERN.search(host))
 
 
 @dataclass
@@ -150,7 +164,7 @@ class BusinessPageExtractor:
             try:
                 element = self.driver.find_element(By.XPATH, selector)
                 website = element.get_attribute("href")
-                if website and "google.com" not in website and "/maps" not in website:
+                if website and "/maps" not in website and not is_google_domain(website):
                     return website
             except Exception:
                 continue

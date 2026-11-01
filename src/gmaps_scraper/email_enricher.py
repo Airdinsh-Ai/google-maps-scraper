@@ -14,6 +14,7 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 
+from .extractor import is_google_domain
 from .logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -110,7 +111,7 @@ def _best_email(emails: set[str], website_url: str) -> str:
 
 def find_email_for_website(website_url: str, timeout: float = 8.0) -> str:
     """Sucht eine passende E-Mail für die Website. Leerer String, wenn nichts gefunden wurde."""
-    if not website_url or "google.com" in website_url:
+    if not website_url or is_google_domain(website_url):
         return ""
 
     session = requests.Session()
